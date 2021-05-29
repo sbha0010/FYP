@@ -1,0 +1,69 @@
+function [sr_hat1,sr_hat2,si_hat1,si_hat2] = func(M,N,SNR,Sr,Si)
+
+% DESCRIPTION: This function is responsible for simulating quantised
+% outputs at the receiver side. In the main code, it will run 10e5 number
+% of times and each time the BER is calculated for each SNR (if user
+% chooses A) or for each N (if user chooses B).
+
+% INPUTS: M - Number of TX antenna. This is a fixed number : 2
+%         N - Number of RX Antenna. This number is kept fixed for
+%             Case A , but is varied for Case B.
+%         SNR - Signal to Noise Ratio (dB). This number is kept fixed for
+%               Case B , but is varied for Case A.
+%         Sr - This contains the real values of the transmitted symbols
+%              from the dataset {1,-1}
+%         Si - This contains the imaginary values  of the transmitted
+%              symbols from the dataset {j,-j} which are modelled as {-1,1}
+%
+% OUTPUTS: sr_hat1,sr_hat2 - Real values at the Rx 1 and Rx 2 respectively,
+%                            after quantisation.
+%          si_hat1,si_hat2 -Imaginary values at Rx 1 and Rx 2 respectively,
+%                           after quantisation.
+
+% Channel matrix
+var = 0.5;
+hr = sqrt(var)*randn(N,M);
+hi = sqrt(var)*randn(N,M);
+
+% Estimate of Channel Matrix
+gr = sign(hr);
+gi = sign(hi);
+power = 10^(SNR/10);
+
+
+for n = 1:N
+    noise_r(n) = sqrt(var)*randn(1);
+    noise_i(n) = sqrt(var)*randn(1);
+    for m = 1:M
+        
+        % Real
+        sh_r(n,m) = (hr(n,m)*Sr(m)) - (hi(n,m)*Si(m));
+        shr(n) = sum(sh_r(n,:));
+        zr(n) = sign(sqrt(power/(2*M))*shr(n)+noise_r(n));
+        
+        % Imaginary
+        sh_i(n,m) = (hr(n,m)*Si(m)) +  (hi(n,m)*Sr(m));
+        shi(n) = sum(sh_i(n,:));
+        zi(n) = sign(sqrt(power/(2*M))*shi(n)+noise_i(n));
+        
+    end
+end
+
+% Received vector multiplied by channel estimate G
+for n = 1:N
+    for m = 1:M
+        gz_r(n,m) = gr(n,m)*zr(n);
+        gz_i(n,m) = gi(n,m)*zi(n);
+    end
+    gz_r_sum1 = sum(gz_r(:,1));
+    gz_r_sum2 = sum(gz_r(:,2));
+    gz_i_sum1 = sum(gz_i(:,1));
+    gz_i_sum2 = sum(gz_i(:,2));
+end
+
+% Quantised received vector
+sr_hat1 = sign(gz_r_sum1);
+sr_hat2 = sign(gz_r_sum2);
+si_hat1 = sign(gz_i_sum1);
+si_hat2 = sign(gz_i_sum2);
+end
