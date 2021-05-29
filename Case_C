@@ -1,0 +1,242 @@
+%% FYP OBJECTIVE C
+% Investigating performance of communication system with massive antenna
+% array at the receiver side and TX antenna = 2
+
+clear all; clc; close all;
+
+%% Initialisations
+M = 2;          % Number of TX anteanna
+indx1 = 1;
+indx2 = 1;
+% Ask for user inputs
+user_input1 = 'If plot needed is SNR vs BER,enter A.If plot needed is N vs BER, enter B: ';
+f1 = input(user_input1,'s');
+if strcmp(f1,'A')
+    
+    %% Case A: SNR vs BER with N fixed
+    
+    user_input2 = 'Enter Number of Receivers? [Y/N]: ';
+    f2 = input(user_input2,'s');
+    if strcmp(f2,'Y')
+        N = str2double(input('Enter number of Rx antenna: ','s'));
+        if  isnan(N)
+            disp('Please enter an integer')
+        else
+        end
+    else
+        N = [50,100,150];        % Default values
+    end
+    %x = zeros(length(N),9);
+    SNR = zeros(length(N),9);
+    BER_r = zeros(length(N),9);
+    BER_i = zeros(length(N),9);
+    SNR_r = zeros(length(N),9);
+    SNR_i = zeros(length(N),9);
+    
+    for t = 1:length(N)
+        
+        for SNR = -10:2:10
+            S_r = [1,-1];                % Real codeword
+            S_i = [1,-1];                % Imaginary codeword
+            sr = S_r(randi(length(S_r)));
+            si = S_i(randi(length(S_i)));
+            Sr = sr*ones(1,N(t));
+            Si = sr*ones(1,N(t));
+            err_rtotal = 0;
+            err_itotal = 0;
+            
+            for bits = 1:1:100000
+                % Function call
+                [sr_hat1,sr_hat2,si_hat1,si_hat2]=func(M,N(t),SNR,Sr,Si);
+                
+                % Calculate Errors:  Real
+                if (sr_hat1 == Sr(1) && sr_hat2 == Sr(2))
+                    err_r = 0;
+                elseif (sr_hat1 ~= Sr(1) && sr_hat2 ~= Sr(2))
+                    err_r = 2;
+                else
+                    err_r = 1;
+                end
+                err_rtotal = err_rtotal+ err_r;
+                
+                % Calculate Errors:  Imaginary
+                if (si_hat1 == Si(1) && si_hat2 == Si(2))
+                    err_i = 0;
+                elseif (si_hat1 ~= Si(1) && si_hat2 ~= Si(2))
+                    err_i = 2;
+                else
+                    err_i = 1;
+                end
+                err_itotal = err_itotal+ err_i;
+                
+            end
+            SNR_r(indx2,indx1) = SNR;
+            SNR_i(indx2,indx1) = SNR;
+            BER_r(indx2,indx1) = M*(err_rtotal/bits)/2;
+            BER_i(indx2,indx1) = M*(err_itotal/bits)/2;
+            indx1 = indx1+1;
+        end
+        indx1 = 1;
+        indx2 = indx2+1;
+    end
+    
+    %% Calculate max BER
+    max_err = [max(BER_r),max(BER_i)];
+    k = [find(max_err(1)),find(max_err(2))];
+    SNR_err = [SNR_r(k(1)),SNR_r(k(2))];
+    
+    fprintf('Maximum error for real part is %0.3f at SNR of %d dB\n', ...
+        max_err(1),SNR_err(1))
+    fprintf('Maximum error for imaginary part is %0.3f at SNR of %d dB\n'...
+        ,max_err(2),SNR_err(2))
+    
+    
+    %% Graphs
+    if strcmp(f2,'N')
+        figure (1)
+        s1 = semilogy(SNR_r,BER_r(1,:),'-ko');
+        hold on
+        s2 = semilogy(SNR_r,BER_r(2,:),'-go');
+        hold on
+        s3 = semilogy(SNR_r,BER_r(3,:),'-bo');
+        xlabel('SNR [dB]')
+        ylabel('BER')
+        str = sprintf('BER for Real Part when M = 2 at varying SNR');
+        title(str)
+        hold on;
+        plot(SNR_err(k(1)),max_err(1), 'rx', 'MarkerSize',20);
+        hold on
+        legend([s1(1),s2(1),s3(1)],'N = 50','N = 100','N = 150')
+        hold off
+        
+        
+        
+        figure (2)
+        s1 = semilogy(SNR_i,BER_i(1,:),'-ko');
+        hold on
+        s2 = semilogy(SNR_i,BER_i(2,:),'-go');
+        hold on
+        s3 = semilogy(SNR_i,BER_i(3,:),'-bo');
+        xlabel('SNR [dB]')
+        ylabel('BER')
+        str = sprintf('BER for Imaginary Part when M = 2 at varying SNR');
+        title(str)
+        hold on;
+        plot(SNR_err(k(1)),max_err(1), 'rx', 'MarkerSize',20);
+        hold on
+        legend([s1(1),s2(1),s3(1)],'N = 50','N = 100','N = 150','Max BER')
+        hold off
+        
+    else
+        figure (1)
+        semilogy(SNR_r,BER_r,'-o')
+        hold on
+        xlabel('SNR [dB]')
+        ylabel('BER')
+        str = sprintf('BER for Real Part when M =2 at N = %d',N);
+        title(str)
+        hold on;
+        plot(SNR_err(k(1)),max_err(1), 'rx', 'MarkerSize',20);
+        hold off
+        
+        figure (2)
+        semilogy(SNR_i,BER_i,'-o')
+        hold on
+        xlabel('SNR [dB]')
+        ylabel('BER')
+        str = sprintf('BER for Imaginary Part when M =2 at N = %d',N);
+        title(str)
+        hold on;
+        plot(SNR_err(k(2)),max_err(2), 'rx', 'MarkerSize',20);
+        hold off
+    end
+    
+elseif strcmp(f1,'B')
+    
+    %% Case B: N vs BER with SNR fixed
+    SNR = 20;
+    N = zeros(1,10);
+    BER_r = length(N);
+    BER_i = length(N);
+    
+    for N = [50,60,70,80,90,100,110,120]    % Varying number of Rx
+        
+        Sr = ones(1,M);
+        Si = ones(1,M);
+        err_rtotal = 0;
+        err_itotal = 0;
+        
+        for bits = 1:1:100000
+            
+            %Function call
+            [sr_hat1,sr_hat2,si_hat1,si_hat2]=func(M,N,SNR,Sr,Si);
+            
+            % Calculate Errors:  Real
+            if (sr_hat1 == Sr(1)) && (sr_hat2 == Sr(2))
+                err_r = 0;
+                
+            elseif (sr_hat1 ~= Sr(1) && sr_hat2 ~= Sr(2))
+                err_r = 2;
+            else
+                err_r = 1;
+            end
+            err_rtotal = err_rtotal+ err_r;
+            
+            % Calculate Errors:  Imaginary
+            if (si_hat1 == Si(1)) && (si_hat2 == Si(2))
+                err_i = 0;
+            elseif (si_hat1 ~= Si(1) && si_hat2 ~= Si(2))
+                err_i = 2;
+            else
+                err_i = 1;
+            end
+            err_itotal = err_itotal+ err_i;
+            
+            
+        end
+        N_r(indx1) = N;
+        N_i(indx1) = N;
+        bits = bits;
+        BER_r(indx1) = 2*M*(err_rtotal/bits)/2;
+        BER_i(indx1) = 2*M*(err_itotal/bits)/2;
+        
+        indx1 = indx1+1;
+    end
+    
+    %% Calculate max BER
+    max_err = [max(BER_r),max(BER_i)];
+    k = [find(max_err(1)),find(max_err(2))];
+    N_err = [N_r(k(1)),N_i(k(2))];
+    
+    fprintf('Maximum error for real part is %0.3f at  N  %d\n',...
+        max_err(1),N_err(1))
+    fprintf('Maximum error for imaginary part is %0.3f at N %d\n',...
+        max_err(2),N_err(2))
+    
+    %% Graphs
+    figure (1)
+    semilogy(N_r,BER_r,'-o')
+    xlabel('Number of Rx antenna')
+    ylabel('BER')
+    str = sprintf('BER Vs N for Real part when M = 2 and SNR = %d dB',SNR);
+    title(str)
+    hold on;
+    plot(N_err(1),max_err(1), 'rx', 'MarkerSize',20);
+    hold off;
+    
+    figure(2)
+    semilogy(N_i,BER_i,'-o')
+    xlabel('Number of Rx antenna')
+    ylabel('BER')
+    str = sprintf('BER vs N for Imaginary part when M = 2 and SNR = %d dB',SNR);
+    title(str)
+    hold on;
+    plot(N_err(2),max_err(2), 'rx', 'MarkerSize',20);
+    hold off;
+    
+else
+    fprintf('Invalid entry. Please try again.')
+end
+
+%%
+
