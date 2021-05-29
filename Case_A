@@ -1,0 +1,140 @@
+%% FYP OBJECTIVE A
+% Investigating performance of communication system where single antenna tx
+% and rx have 1-bit ADC and DAC at input and output
+
+clc; clear all; close all;
+
+%% Initialisations
+M = 1;                   % Number of TX antenna
+var = 1;                 % variance for combined real and imag noise
+index = 1;
+flag = 1;
+SNR = zeros(1,14);
+BER_r = length(SNR);
+BER_i = length(SNR);
+SNR_r = length(SNR);
+SNR_i = length(SNR);
+
+
+%% Create input codewords 'S'
+
+% Ask for user input
+user_input2 = 'Enter Codewords to Transmit? [Y/N]: ';
+f2 = input(user_input2,'s');
+
+if strcmp(f2,'Y')
+    Sr = str2double(input('Enter which real codeword should be transmitted (1,-1): ','s'));
+    Si=  str2double(input('Enter which imaginary codeword should be transmitted (1,-1): ','s'));
+    
+    % Check for numbers
+    if  (fix(Sr) ~= Sr  || fix(Si) ~= Si)
+        disp('Please enter numerical values : -1 OR 1. Try again')
+        return
+    end
+    
+else
+    S_r = [1,-1];                % Real codeword
+    S_i = [1,-1];                % Imaginary codeword
+    Sr = S_r(randi(length(S_r)));
+    Si = S_i(randi(length(S_i)));
+end
+%%
+
+s = [Sr;Si];
+for SNR = -10:2:10
+    
+    err_rtotal = 0;
+    err_itotal = 0;
+    
+    for bits = 1:1:100000
+        
+        %% Creating x vector to be transmitted
+        
+        % Generate H- channel matrix
+        v = 0.5;
+        hr = sqrt(v)*randn(1);
+        hi = sqrt(v)*randn(1);
+        h = [hr,-hi;hi,hr];
+        
+        % Generate G
+        gr = sign(hr);
+        gi = sign(hi);
+        g = [gr,gi;-gi,gr];
+        
+        % Compute x
+        x = 0.5*g*s;
+        %%
+        
+        % Multiply by channel matrix
+        xh = h*x;
+        
+        % SNR in dimensionless quantity
+        ebn0= 10^(SNR/10);
+        
+        % Generate noise vector
+        noise = sqrt(var) * randn(1,length(xh)) ;
+        
+        %% Recevied Vector
+        % Add noise and amplify
+        yr = sqrt(ebn0/M)*(xh(1)) + noise(1);
+        yi = sqrt(ebn0/M)*(xh(2)) + noise(2);
+        
+        % Quantisation
+        zr = sign(yr);
+        zi = sign(yi);
+        
+        %% Calculate Errors
+        % Real
+        if zr == s(1)
+            err_r = 0;
+        else
+            err_r = 1;
+        end
+        
+        err_rtotal = err_rtotal+ err_r;
+        
+        % Imaginary
+        if zi == s(2)
+            err_i = 0;
+        else
+            err_i = 1;
+        end
+        err_itotal = err_itotal + err_i;
+        %%
+    end
+    SNR_r(index) = SNR;
+    SNR_i(index) = SNR;
+    BER_r(index) = err_rtotal/bits;
+    BER_i(index) = err_itotal/bits;
+    index = index+1;
+end
+
+%% Calculate max BER
+max_err = [max(BER_r),max(BER_i)];
+k = [find(max_err(1)),find(max_err(2))];
+SNR_err = [SNR_r(k(1)),SNR_r(k(2))];
+
+fprintf('Maximum error for real part is %0.3f at a SNR of %d dB.\n',max_err(1),SNR_err(1))
+fprintf('Maximum error for imaginary part is %0.3f at a SNR of %d dB.\n',max_err(2),SNR_err(2))
+
+
+%% Graphs
+
+figure (1)
+semilogy(SNR_r,BER_r,'-o')
+xlabel('SNR [dB]')
+ylabel('BER')
+title('BER for Real Part')
+hold on;
+plot(SNR_err(k(1)),max_err(1), 'rx', 'MarkerSize',20);
+hold off;
+
+figure(2)
+semilogy(SNR_i,BER_i,'-o')
+xlabel('SNR [dB]')
+ylabel('BER')
+title('BER for Imaginary Part')
+hold on;
+plot(SNR_err(k(2)),max_err(2), 'rx', 'MarkerSize',20);
+hold off;
+
