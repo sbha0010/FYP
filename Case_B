@@ -1,0 +1,238 @@
+%% FYP OBJECTIVE B
+% Investigating performance of communication system with massive antenna 
+% array at the transmitter side with two single antenna RX
+
+clear all; clc; close all;
+
+%% Initialisations
+N = 2;                 % Number of Rx antenna
+dim = [1 50];          % dimensions for dialogue prompt
+var = 0.5;             % variance for gaussian distribution
+indx1 = 1;
+indx2 = 1;
+Sr = zeros(1,2);
+Si = zeros(1,2);
+xhr = zeros(1,N);
+xhi = zeros(1,N);
+noise_r = zeros(1,N);
+noise_i = zeros(1,N);
+
+%Define Received Vector
+yr = zeros(1,N); yi = zeros(1,N);
+zr = zeros(1,N); zi = zeros(1,N);
+
+
+%% Create input codewords 'S'
+
+% Ask for user input
+user_input2 = 'Enter Number of TX antenna and codewords to transmit? [Y/N]: ';
+f2 = input(user_input2,'s');
+
+if strcmp(f2,'Y')
+    S = inputdlg({'Real 1: -1 OR 1','Real 2: -1 OR 1', 'Imag 1: -1 OR 1', 'Imag 2: -1 OR 1','Number of Tx'},'Enter Values', dim);
+    
+    % If user presses cancel
+    if isempty(S)
+        return
+    end
+    % If user enters text
+    if isnan(str2double(S(1))) || isnan(str2double(S(2)))|| isnan(str2double(S(3)))|| isnan(str2double(S(4)))|| isnan(str2double(S(5)))
+        warning = sprintf('Please review the values entered. Try again.');
+        uiwait(warndlg(warning));
+        return
+    end
+    M =  str2double(S(5));
+    Sr = [str2double(S(1)),str2double(S(2))];
+    Si = [str2double(S(3)),str2double(S(4))];
+else                        % Default values
+    M = [50,100,150];                % Number of Tx antenna
+    Sr = [1,1];
+    Si = [1,1];
+end
+%%
+
+% Define vectors to be transmitted
+
+SNR = zeros(length(M),9);
+BER_r = zeros(length(M),9);
+BER_i = zeros(length(M),9);
+SNR_r = zeros(length(M),9);
+SNR_i = zeros(length(M),9);
+
+%%
+for t = 1:length(M)
+    
+    xr1 = zeros(M(t),1); xi1 = zeros(M(t),1);
+    xr2 = zeros(M(t),1); xi2 = zeros(M(t),1);
+    xhr1 = zeros(N,M(t)); xhr2 = zeros(N,M(t));
+    xhi2 = zeros(N,M(t)); xhi1 = zeros(N,M(t));
+    
+    for SNR = -10:2:10
+        
+        err_rtotal = 0;
+        err_itotal = 0;
+        
+        
+        for bits = 1:1:100000
+            
+            %% Creating x vector to be transmitted
+            
+            % Generate H- channel matrix
+            hr = sqrt(var)*randn(N,M(t));
+            hi = sqrt(var)*randn(N,M(t));
+            
+            % Generate G
+            gr = sign(hr);
+            gi = sign(hi);
+            
+            % SNR in dimensionless quantity
+            ebn0= 10^(SNR/10);
+            
+            % Compute x for 2 groups of TX antenna
+            for m = ceil(1:M(t)/2)
+                xr1(m) = 0.5*(gr(1,m)*Sr(1))+ 0.5*(gi(1,m)*Si(1));
+                xi1(m) = 0.5*(-gi(1,m)*Sr(1))+ 0.5*(gr(1,m)*Si(1));
+                
+            end
+            
+            for m = ceil(((M(t)/2)+1):M(t))
+                xr2(m) = 0.5*(gr(2,m)*Sr(2))+ 0.5*(gi(2,m)*Si(2));
+                xi2(m) = 0.5*(-gi(2,m)*Sr(2))+ 0.5*(gr(2,m)*Si(2));
+            end
+            
+            %%
+            % Multiply x by channel matrix- RX 1
+            
+            for m = 1:M(t)/2
+                xhr1(1,m) = ((hr(1,m)*xr1(m)) - (hi(1,m)*xi1(m)));
+                xhi1(1,m) = (hr(1,m)*xi1(m)) + (hi(1,m)*xr1(m));
+            end
+            xhr(1,1) = sum(xhr1(1,:));
+            xhi(1,1) = sum(xhi1(1,:));
+            
+            
+            % Multiply  vectors by channel matrix- RX 2
+            
+            for m = ((M(t)/2)+1):M(t)
+                xhr2(1,m) = ((hr(2,m)*xr2(m)) - (hi(2,m)*xi2(m)));
+                xhi2(1,m) = (hr(2,m)*xi2(m)) + (hi(2,m)*xr2(m));
+            end
+            xhr(1,2) = sum(xhr2(1,:));
+            xhi(1,2) = sum(xhi2(1,:));
+            
+            %% Receiver Side
+            for n = 1:N
+                
+                noise_r(n) = sqrt(var)*randn(1);              % Noise for real part
+                noise_i(n) = sqrt(var)*randn(1);              % Noise for imag part
+                yr(n) = sqrt(ebn0/M(t))*xhr(1,n)+noise_r(1,n);   % Received  real part
+                yi(n) = sqrt(ebn0/M(t))*xhi(1,n)+noise_i(1,n);   % Received  imag part
+                zr(n) = sign(yr(n));                         % Quantised real part
+                zi(n) = sign(yi(n));                         % Quantised imag part
+                
+            end
+            
+            
+            % Calculate Errors:  Real
+            if (zr(1) == Sr(1)) && (zr(2) == Sr(2))
+                err_r = 0;
+            elseif (zr(1) ~= Sr(1)) && (zr(2) ~= Sr(1))
+                err_r = 2;
+            else
+                err_r = 1;
+            end
+            err_rtotal = err_rtotal+ err_r;
+            
+            % Calculate Errors:  Imaginary
+            if (zi(1) == Si(1)) && (zi(2) == Si(2))
+                err_i = 0;
+            elseif (zi(1) ~= Si(1)) && (zi(2) ~= Si(1))
+                err_i = 2;
+            else
+                err_i = 1;
+            end
+            
+            err_itotal = err_itotal+ err_i;
+        end
+        
+        
+        SNR_r(indx2,indx1) = SNR;
+        SNR_i(indx2,indx1) = SNR;
+        BER_r(indx2,indx1) = (err_rtotal/bits)/2;
+        BER_i(indx2,indx1) = (err_itotal/bits)/2;
+        indx1 = indx1+1;
+        
+    end
+    indx1 = 1;
+    indx2 = indx2+1;
+end
+%% Calculate max BER
+
+max_err = [max(BER_r),max(BER_i)];
+k = [find(max_err(1)),find(max_err(2))];
+SNR_err = [SNR_r(k(1)),SNR_r(k(2))];
+
+fprintf('Maximum error for real part is %0.3f at a SNR of %d\n',max_err(1),SNR_err(1))
+fprintf('Maximum error for imaginary part is %0.3f at a SNR of %d\n',max_err(2),SNR_err(2))
+
+%
+%% Graphs
+if strcmp(f2,'N')
+    figure (1)
+    s1 = semilogy(SNR_r,BER_r(1,:),'-ko');
+    hold on
+    s2 = semilogy(SNR_r,BER_r(2,:),'-go');
+    hold on
+    s3 = semilogy(SNR_r,BER_r(3,:),'-bo');
+    xlabel('SNR [dB]')
+    ylabel('BER')
+    str = sprintf('BER for Real Part when N = 2 at varying SNR');
+    title(str)
+    hold on;
+    plot(SNR_err(k(1)),max_err(1), 'rx', 'MarkerSize',20);
+    hold on
+    legend([s1(1),s2(1),s3(1)],'M = 50','M = 100','M = 150')
+    hold off
+    
+    
+    
+    figure (2)
+    s1 = semilogy(SNR_i,BER_i(1,:),'-ko');
+    hold on
+    s2 = semilogy(SNR_i,BER_i(2,:),'-go');
+    hold on
+    s3 = semilogy(SNR_i,BER_i(3,:),'-bo');
+    xlabel('SNR [dB]')
+    ylabel('BER')
+    str = sprintf('BER for Imaginary Part when N = 2 at varying SNR');
+    title(str)
+    hold on;
+    plot(SNR_err(k(1)),max_err(1), 'rx', 'MarkerSize',20);
+    hold on
+    legend([s1(1),s2(1),s3(1)],'M = 50','M = 100','M = 150')
+    hold off
+    
+else
+    figure (1)
+    semilogy(SNR_r,BER_r,'-o')
+    hold on
+    xlabel('SNR [dB]')
+    ylabel('BER')
+    str = sprintf('BER for Real Part when N = 2 and M = %d', M);
+    title(str)
+    hold on;
+    plot(SNR_err(k(1)),max_err(1), 'rx', 'MarkerSize',20);
+    hold off
+    
+    figure (2)
+    semilogy(SNR_i,BER_i,'-o')
+    hold on
+    xlabel('SNR [dB]')
+    ylabel('BER')
+    str = sprintf('BER for Imaginary Part when N = 2 and M = %d', M);
+    title(str)
+    hold on;
+    plot(SNR_err(k(1)),max_err(1), 'rx', 'MarkerSize',20);
+    hold off
+end
+%%
